@@ -2,37 +2,16 @@ import re
 import json
 import os
 import asyncio
+import logging
 from typing import List, Dict
 from chat_assistant import ChatAssistant
+from pmem.async_pmem import PersistentMemory
 import asyncio
-import pickle
-import aiofiles
 from json_repair import repair_json
 
-# データをピクル化して非同期にファイルに保存
-async def async_pickle_dump(data, filename):
-    try:
-        async with aiofiles.open(filename, 'wb') as file:
-            pickled_data = pickle.dumps(data)
-            await file.write(pickled_data)
-        print(f"データを {filename} に保存しました。")
-    except Exception as e:
-        print(f"保存中にエラーが発生: {e}")
 
-# 非同期でピクルファイルからデータをロード
-async def async_pickle_load(filename):
-    try:
-        async with aiofiles.open(filename, 'rb') as file:
-            pickled_data = await file.read()
-            data = pickle.loads(pickled_data)
-        print(f"{filename} からデータをロードしました。")
-        return data
-    except Exception as e:
-        print(f"ロード中にエラーが発生: {e}")
-        return None
-    
 class KatakanaTranslator:
-    def __init__(self, model: str = "gemini/gemini-1.5-flash-002"):
+    def __init__(self, model: str = "gemini/gemini-1.5-flash-002", cache_file_name: str = "katakana_translate_cache.db"):
         """
         テキスト翻訳クラスの初期化
         
@@ -40,7 +19,9 @@ class KatakanaTranslator:
             model (str, optional): 使用するAIモデル. デフォルトは"gemini/gemini-1.5-flash-002".
         """
         self.chache = {}
-        self.assistant = ChatAssistant()
+        self.logger = logging.getLogger(__name__)
+        self.memory = PersistentMemory(cache_file_name)
+        self.assistant = ChatAssistant(memory=self.memory)
         self.assistant.model_manager.change_model(model)
 
     def extract_alphanumeric(self, text: str) -> List[str]:
@@ -70,7 +51,7 @@ class KatakanaTranslator:
                        "Python の dict 型で出力してください。コメントや補足は不要です。\n")
 
         response = await self.assistant.chat("", f"{prompt_text}\n\n{words}")
-        print(response)
+        self.logger.debug(response)
         return json.loads(repair_json(response))    
     
 
@@ -79,10 +60,7 @@ class KatakanaTranslator:
         キャッシュされた翻訳を取得する
         """
         key = f"translation_{text}"
-        if not self.chache:
-            if os.path.exists("translation_cache.pkl"):
-                self.chache = await async_pickle_load("translation_cache.pkl")
-        result = self.chache.get(key, None)
+        result = await self.memory.load(key)
         return result
 
     async def save_translation(self, text: str, translated_text: str) -> None:
@@ -90,10 +68,7 @@ class KatakanaTranslator:
         翻訳をキャッシュする
         """
         key = f"translation_{text}"
-        if not self.chache:
-            self.chache = {}
-        self.chache[key] = translated_text
-        await async_pickle_dump(self.chache, "translation_cache.pkl")
+        await self.memory.save(key, translated_text)
 
     async def translate_text(self, text: str) -> str:
         # 英数字の単語を抽出
@@ -116,16 +91,17 @@ class KatakanaTranslator:
 
         # カタカナ翻訳を取得
         if alphanumeric_words:
-            print("Translating to Katakana...")
-            print(alphanumeric_words)
+            self.logger.debug("Translating to Katakana...")
+            self.logger.debug(alphanumeric_words)
             translates = await self.translate_to_katakana(alphanumeric_words)
         else:
-            print("No words to translate.")
+            self.logger.debug("No words to translate.")
             translates = {}
         
         translates.update(cached_words)
-        print("Translation completed.")
-        print(translates)
+
+        self.logger.debug("Translation completed.")
+        self.logger.debug(translates)
 
         # テキストを置き換え
         for key in sorted_words:
@@ -138,20 +114,23 @@ class KatakanaTranslator:
 async def main():
     # 使用例
     text = """
-    LibreChatのデータベース全体をテキスト形式でダンプする方法について、以下の手順を用いることで実現できます。
-    Ubuntu20.04にはApache2はプレインストールされていません。
+    LibreChatのdatabase全体をtext形式でdumpする方法について、以下の手順を用いることで実現できます。
+    Ubuntu20.04にはApache2はpreinstallされていません。
     a123, http://example.com, superuser, 123456
-    Ubuntuは、デスクトップ版とサーバー版の2つのEditionがあります。
-    Mongoの意味は何ですか？知らんけど。
+    Ubuntuは、Desktop版とServer版の2つのEditionがあります。
+    Mongoの意味は何ですか？知らんけど。GEMINI_API_KEY
     """
+
+    print("Original text:")
+    print(text)
     
     translator = KatakanaTranslator()
     translated_text = await translator.translate_text(text)
 
-    print("Original text:")
-    print(text)
     print("\nTranslated text:")
     print(translated_text)
+
+    await asyncio.sleep(1)
 
 if __name__ == "__main__":
     asyncio.run(main())

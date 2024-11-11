@@ -1,4 +1,4 @@
-/.env
-/chat_log.db
-/translation_cache.pkl
 /venv
+.env
+*.pkl
+*.db
