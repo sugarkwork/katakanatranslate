@@ -69,14 +69,10 @@ class KatakanaTranslator:
         """
         key = f"translation_{text}"
         await self.memory.save(key, translated_text)
-
-    async def translate_text(self, text: str) -> str:
-        # 英数字の単語を抽出
-        alphanumeric_words = list(set(self.extract_alphanumeric(text)))
-
-        # 英数字の文字列の長い順にソートする
-        sorted_words = alphanumeric_words.copy()
-        sorted_words.sort(key=lambda x: len(x), reverse=True)
+    
+    async def translate_dict(self, text:str=None, alphanumeric_words:List[str] = None) -> Dict[str, str]:
+        if not alphanumeric_words and text:
+            alphanumeric_words = list(set(self.extract_alphanumeric(text)))
 
         # キャッシュされた翻訳を取得
         cached_words = {}
@@ -100,18 +96,29 @@ class KatakanaTranslator:
         
         translates.update(cached_words)
 
+        return translates
+
+    async def translate_text(self, text: str) -> str:
+        # 英数字の単語を抽出
+        alphanumeric_words = list(set(self.extract_alphanumeric(text)))
+
+        # 英数字の文字列の長い順にソートする
+        sorted_words = alphanumeric_words.copy()
+        sorted_words.sort(key=lambda x: len(x), reverse=True)
+
+        translates = await self.translate_dict(alphanumeric_words=alphanumeric_words)
+
         self.logger.debug("Translation completed.")
         self.logger.debug(translates)
 
         # テキストを置き換え
         for key in sorted_words:
             text = text.replace(key, translates[key])
-            if key not in cached_words:
-                await self.save_translation(key, translates[key])
+            await self.save_translation(key, translates[key])
     
         return text
 
-async def main():
+def main():
     # 使用例
     text = """
     LibreChatのdatabase全体をtext形式でdumpする方法について、以下の手順を用いることで実現できます。
@@ -124,13 +131,21 @@ async def main():
     print("Original text:")
     print(text)
     
-    translator = KatakanaTranslator()
-    translated_text = await translator.translate_text(text)
 
     print("\nTranslated text:")
+    translator = KatakanaTranslator()
+    translated_text = asyncio.run(translator.translate_text(text))
+    # translated_text = await translator.translate_text(text) # async
     print(translated_text)
 
-    await asyncio.sleep(1)
+
+    print("\nTranslated text to dict:")
+    translated_dict = asyncio.run(translator.translate_dict(text))
+    # translated_dict = await translator.translate_dict(text) # async
+    print(json.dumps(translated_dict, indent=4, ensure_ascii=False))
+
+
+    asyncio.run(asyncio.sleep(1))
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
