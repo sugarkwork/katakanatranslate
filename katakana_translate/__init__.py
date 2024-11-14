@@ -120,8 +120,20 @@ class KatakanaTranslator:
             await self.save_translation(key, translates[key])
     
         return text
+    
+    async def close(self):
+        if self.memory:
+            await asyncio.sleep(0.1)
+            await self.memory.close()
+    
+    async def __aenter__(self):
+        return self
+    
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.close()
 
-def main():
+
+async def main():
     # 使用例
     text = """
     LibreChatのdatabase全体をtext形式でdumpする方法について、以下の手順を用いることで実現できます。
@@ -134,21 +146,17 @@ def main():
     print("Original text:")
     print(text)
     
+    async with KatakanaTranslator() as translator:
+        print("\nTranslated text:")
 
-    print("\nTranslated text:")
-    translator = KatakanaTranslator()
-    translated_text = asyncio.run(translator.translate_text(text))
-    # translated_text = await translator.translate_text(text) # async
-    print(translated_text)
+        translated_text = await translator.translate_text(text)
+        print(translated_text)
 
+        print("\nTranslated text to dict:")
+        translated_dict = await translator.translate_dict(text)
 
-    print("\nTranslated text to dict:")
-    translated_dict = asyncio.run(translator.translate_dict(text))
-    # translated_dict = await translator.translate_dict(text) # async
-    print(json.dumps(translated_dict, indent=4, ensure_ascii=False))
+        print(json.dumps(translated_dict, indent=4, ensure_ascii=False))
 
-
-    asyncio.run(asyncio.sleep(1))
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
