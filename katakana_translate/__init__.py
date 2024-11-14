@@ -34,8 +34,11 @@ class KatakanaTranslator:
         Returns:
             List[str]: 抽出された英数字の文字列リスト
         """
-        pattern = r'[a-zA-Z]+(?:\d+(?:\.\d+)*)?(?:\d+)?'
-        return re.findall(pattern, text)
+        # alphabet plus number
+        pattern1 = r'[a-zA-Z]+(?:\d+(?:\.\d+)*)?(?:\d+)?'
+        # alphabet only
+        pattern2 = r'[a-zA-Z]+'
+        return list(set(re.findall(pattern1, text) + re.findall(pattern2, text)))
 
     async def translate_to_katakana(self, words: List[str]) -> Dict[str, str]:
         """
