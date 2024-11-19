@@ -4,7 +4,6 @@ import os
 import asyncio
 import logging
 from typing import List, Dict
-from chat_assistant import ChatAssistant
 from pmem.async_pmem import PersistentMemory
 import asyncio
 from json_repair import repair_json
@@ -19,10 +18,18 @@ class KatakanaTranslator:
             model (str, optional): 使用するAIモデル. デフォルトは"gemini/gemini-1.5-flash-002".
         """
         self.chache = {}
+        self.model = model
         self.logger = logging.getLogger(__name__)
         self.memory = PersistentMemory(cache_file_name)
+    
+    def get_assistant(self):
+        if self.assistant:
+            return self.assistant
+
+        from chat_assistant import ChatAssistant
         self.assistant = ChatAssistant(memory=self.memory)
-        self.assistant.model_manager.change_model(model)
+        self.assistant.model_manager.change_model(self.model)
+        return self.assistant
 
     def extract_alphanumeric(self, text: str) -> List[str]:
         """
@@ -53,6 +60,7 @@ class KatakanaTranslator:
         prompt_text = ("次の英単語および数字を英語風のカタカナ読みにするとどうなりますか？\n"
                        "Python の dict 型で出力してください。コメントや補足は不要です。\n")
 
+        self.get_assistant()
         response = await self.assistant.chat("", f"{prompt_text}\n\n{words}")
         self.logger.debug(response)
         return json.loads(repair_json(response))    
@@ -80,9 +88,9 @@ class KatakanaTranslator:
         # キャッシュされた翻訳を取得
         cached_words = {}
         for word in alphanumeric_words:
-            translated_text = await self.get_cached_translation(word)
-            if translated_text:
-                cached_words[word] = translated_text
+            if translated_text := await self.get_cached_translation(word):
+                if translated_text := translated_text.strip():
+                    cached_words[word] = translated_text
 
         # キャッシュされた翻訳をテキストから削除
         for key in cached_words.keys():
