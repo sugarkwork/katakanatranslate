@@ -91,7 +91,8 @@ class KatakanaTranslator:
         for word in alphanumeric_words:
             if translated_text := await self.get_cached_translation(word):
                 if translated_text := translated_text.strip():
-                    cached_words[word] = translated_text
+                    if word != translated_text:
+                        cached_words[word] = translated_text
 
         # キャッシュされた翻訳をテキストから削除
         for key in cached_words.keys():
