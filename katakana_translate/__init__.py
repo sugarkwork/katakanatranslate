@@ -21,6 +21,7 @@ class KatakanaTranslator:
         self.model = model
         self.logger = logging.getLogger(__name__)
         self.memory = PersistentMemory(cache_file_name)
+        self.assistant = None
     
     def get_assistant(self):
         if self.assistant:
