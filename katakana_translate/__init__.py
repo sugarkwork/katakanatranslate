@@ -10,17 +10,20 @@ from json_repair import repair_json
 
 
 class KatakanaTranslator:
-    def __init__(self, model: str = "gemini/gemini-1.5-flash-002", cache_file_name: str = "katakana_translate_cache.db"):
+    def __init__(self, model: str = "deepseek/deepseek-chat", cache_file: str = "katakana_translate_cache.db"):
         """
         テキスト翻訳クラスの初期化
         
         Args:
-            model (str, optional): 使用するAIモデル. デフォルトは"gemini/gemini-1.5-flash-002".
+            model (str, optional): 使用するAIモデル. デフォルトは"deepseek/deepseek-chat".
         """
         self.chache = {}
         self.model = model
         self.logger = logging.getLogger(__name__)
-        self.memory = PersistentMemory(cache_file_name)
+        if isinstance(cache_file, str):
+            self.memory = PersistentMemory(cache_file)
+        elif isinstance(cache_file, PersistentMemory):
+            self.memory = cache_file
         self.assistant = None
     
     def get_assistant(self):
@@ -71,7 +74,7 @@ class KatakanaTranslator:
         """
         キャッシュされた翻訳を取得する
         """
-        key = f"translation_{text}"
+        key = f"translation_cache_{text}"
         result = await self.memory.load(key)
         return result
 
@@ -79,7 +82,7 @@ class KatakanaTranslator:
         """
         翻訳をキャッシュする
         """
-        key = f"translation_{text}"
+        key = f"translation_cache_{text}"
         await self.memory.save(key, translated_text)
     
     async def translate_dict(self, text:str=None, alphanumeric_words:List[str] = None) -> Dict[str, str]:
